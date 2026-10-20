@@ -1,0 +1,22 @@
+# Keep downloaded and processed datasets off GitHub
+/data/raw/
+/data/interim/
+/data/processed/
+
+# Keep API credentials private
+.env
+.env.*
+!.env.example
+
+# Ignore Python-generated files
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Ignore Jupyter temporary files
+.ipynb_checkpoints/
+
+# Ignore operating-system files
+.DS_Store
+Thumbs.db
