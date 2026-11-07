@@ -5,6 +5,7 @@ Reads  data/processed/dubai_layers.gpkg (layer 'route_shapes')
 Writes data/processed/bus_route_segments.csv  (ordered segments each bus line uses)
        data/processed/bus_match_quality.csv   (one row per bus line: shares ok / mismatch / unmatched, breaks)
 """
+import argparse
 from pathlib import Path
 
 import geopandas as gpd
@@ -20,13 +21,17 @@ UTM = 32640
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--method", choices=["viterbi", "nearest"], default="viterbi")
+    method = parser.parse_args().method
+    print(f"Matching method: {method}")
     shapes = gpd.read_file(SHAPES, layer="route_shapes").to_crs(UTM)
     segs = gpd.read_file(SEGMENTS, layer="segments").to_crs(UTM)
 
     points = sample_shape_points(shapes)
     print(f"{len(shapes):,} bus lines -> {len(points):,} sample points")
 
-    matched = match_points(points, segs)
+    matched = match_points(points, segs, method=method)
     print("\nPoint status:")
     print((matched["status"].value_counts(normalize=True) * 100).round(2).to_string())
 
