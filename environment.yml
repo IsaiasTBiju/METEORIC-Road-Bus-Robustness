@@ -1,0 +1,15 @@
+name: meteoric
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - geopandas
+  - osmnx
+  - networkx
+  - pandas
+  - pyogrio
+  - pyarrow
+  - matplotlib
+  - jupyterlab
+  - pytest
+  - streamlit

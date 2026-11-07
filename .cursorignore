@@ -1,0 +1,42 @@
+# METEORIC: keep restricted and raw data away from Cursor's AI and indexing.
+# Best-effort only. The real protection is keeping the transaction file
+# outside this repository and never opening its folder in Cursor.
+
+# Restricted data and anything transaction-related
+/data/raw_restricted/
+/restricted/
+/notebooks/restricted/
+*[Tt]ransaction*
+
+# Raw and intermediate data
+/data/raw/
+/data/interim/
+/data/processed/
+
+# Data and GIS formats
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.zip
+*.kml
+*.kmz
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+*.geojson
+
+# ...except invented synthetic data, which Cursor may read
+!/data/synthetic/**
+
+# Credentials and secrets
+.env
+.env.*
+.streamlit/secrets.toml
+
+# Caches and generated results
+/cache/
+/results/
+.ipynb_checkpoints/

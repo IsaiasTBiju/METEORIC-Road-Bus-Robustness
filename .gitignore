@@ -20,3 +20,47 @@ venv/
 # Ignore operating-system files
 .DS_Store
 Thumbs.db
+# ---- METEORIC additions ----
+
+# Restricted data: the transaction file should live OUTSIDE this repo.
+# These rules are a backup safety net only.
+/data/raw_restricted/
+/restricted/
+*[Tt]ransaction*.csv
+*[Tt]ransaction*.parquet
+*[Tt]ransaction*.xlsx
+*[Tt]ransaction*.zip
+
+# Data and GIS formats: never commit by default
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.zip
+*.kml
+*.kmz
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+*.geojson
+# ...except invented synthetic data, which is safe to commit
+!/data/synthetic/**
+
+# OSMnx download cache
+/cache/
+
+# Generated results: revisit in Stage 9 to decide what aggregate outputs to commit
+/results/
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# QGIS backup files
+*.qgs~
+*.qgz~
+
+# Test and log files
+.pytest_cache/
+*.log
