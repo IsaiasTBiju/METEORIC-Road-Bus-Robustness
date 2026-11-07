@@ -1,0 +1,8 @@
+segment_id,from_node,to_node,oneway,length_m,data_status
+S1,A,B,False,500,SYNTHETIC
+S2,B,C,False,400,SYNTHETIC
+S3,C,D,True,300,SYNTHETIC
+S4,D,E,False,250,SYNTHETIC
+S5,B,E,True,700,SYNTHETIC
+S6,E,F,False,350,SYNTHETIC
+S7,F,C,True,300,SYNTHETIC

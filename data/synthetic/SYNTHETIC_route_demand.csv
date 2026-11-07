@@ -1,0 +1,4 @@
+route_id,monthly_total,data_status
+R1,12000,SYNTHETIC
+R2,5000,SYNTHETIC
+R3,3000,SYNTHETIC
