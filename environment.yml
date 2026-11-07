@@ -13,3 +13,4 @@ dependencies:
   - jupyterlab
   - pytest
   - streamlit
+  - py7zr
