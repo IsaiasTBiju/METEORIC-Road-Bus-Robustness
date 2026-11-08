@@ -136,13 +136,26 @@ def choose_segments(net: Network, model: str, strategy: str, n: int, seed: int =
     return np.sort(order[:n])
 
 
-def run_scenario(net: Network, model: str, strategy: str, n: int, seed: int = 0,
-                 candidates: np.ndarray | None = None) -> dict:
-    removed = choose_segments(net, model, strategy, n, seed, candidates)
+def _base_share(net: Network, directed: bool) -> float:
+    if directed not in net._base:
+        net._base[directed] = road_share(net, np.array([], dtype=int), directed)
+    return net._base[directed]
+
+
+def evaluate(net: Network, model: str, strategy: str, n: int, seed: int,
+             removed: np.ndarray, cache: dict | None = None) -> dict:
+    """Measures for one model after removing the given segment indices.
+
+    cache (optional dict) lets several models share work when they see the same removal set.
+    """
     directed = MODELS[model]["directed"]
-    base = road_share(net, np.array([], dtype=int), directed)
-    after = road_share(net, removed, directed)
-    hit = affected_routes(net, removed)
+    cache = {} if cache is None else cache
+    key = removed.tobytes()
+    if ("road", directed, key) not in cache:
+        cache[("road", directed, key)] = road_share(net, removed, directed)
+    if ("hit", key) not in cache:
+        cache[("hit", key)] = affected_routes(net, removed)
+    base, after, hit = _base_share(net, directed), cache[("road", directed, key)], cache[("hit", key)]
     total_demand = net.route_demand.sum()
     return {
         "model": model, "strategy": strategy, "n_removed": int(n), "seed": seed,
@@ -153,3 +166,17 @@ def run_scenario(net: Network, model: str, strategy: str, n: int, seed: int = 0,
         "demand_affected_share": net.route_demand[hit].sum() / total_demand if total_demand else np.nan,
         "removed_segment_ids": net.segment_ids[removed],
     }
+
+
+def run_scenario(net: Network, model: str, strategy: str, n: int, seed: int = 0,
+                 candidates: np.ndarray | None = None) -> dict:
+    removed = choose_segments(net, model, strategy, n, seed, candidates)
+    return evaluate(net, model, strategy, n, seed, removed)
+
+
+def run_all_models(net: Network, strategy: str, n: int, seed: int = 0,
+                   candidates: np.ndarray | None = None) -> list[dict]:
+    """Run M0-M3 on the same scenario, sharing identical work (same numbers as run_scenario)."""
+    cache: dict = {}
+    return [evaluate(net, m, strategy, n, seed, choose_segments(net, m, strategy, n, seed, candidates), cache)
+            for m in MODELS]

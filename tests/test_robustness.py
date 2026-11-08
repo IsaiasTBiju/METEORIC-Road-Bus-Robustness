@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from meteoric.robustness import affected_routes, build_network, choose_segments, road_share, run_scenario
+from meteoric.robustness import (affected_routes, build_network, choose_segments, road_share, run_all_models,
+                                 run_scenario)
 
 
 @pytest.fixture
@@ -93,3 +94,22 @@ def test_bad_inputs_fail_loudly(net):
     segs = pd.DataFrame({"segment_id": ["S1"], "from_node": ["A"], "to_node": ["B"], "oneway": [False]})
     with pytest.raises(ValueError):
         build_network(segs, pd.DataFrame({"route": ["R"], "segment_id": ["NOPE"]}))
+
+
+def test_candidate_pool_restricts_both_strategies(net):
+    allowed = np.array([False, False, False, True, True, True])        # only S4, S5, S6 may fail
+    for seed in range(5):
+        assert set(net.segment_ids[choose_segments(net, "M0", "random", 2, seed, allowed)]) <= {"S4", "S5", "S6"}
+    # S1-S3 carry the most demand, but are not allowed, so targeted picks the best allowed ones
+    assert set(net.segment_ids[choose_segments(net, "M2", "targeted", 2, 0, allowed)]) == {"S4", "S5"}
+    with pytest.raises(ValueError):
+        choose_segments(net, "M0", "random", 4, 0, allowed)             # only 3 candidates
+
+
+def test_run_all_models_matches_single_runs(net):
+    for strategy, n in (("random", 2), ("targeted", 2)):
+        together = {r["model"]: r for r in run_all_models(net, strategy, n, seed=3)}
+        for model in ("M0", "M1", "M2", "M3"):
+            single = run_scenario(net, model, strategy, n, seed=3)
+            for key in ("road_share_after", "road_retained", "routes_affected", "demand_affected_share"):
+                assert together[model][key] == pytest.approx(single[key])
