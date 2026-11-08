@@ -105,3 +105,61 @@ def test_viterbi_keeps_unmatched_points_and_wrong_way_flags():
     assert (match_points(pts, segs_table(), method="viterbi")["status"] == "unmatched").all()
     pts = sample_shape_points(bus("s", [(180, -20), (20, -20)]))
     assert (match_points(pts, segs_table(), method="viterbi")["status"] == "direction_mismatch").all()
+
+
+# ---- gap filling -------------------------------------------------------------------------------
+from meteoric.bus_matching import fill_gaps  # noqa: E402
+
+
+def gap_segs():
+    rows = [
+        # id, from, to, oneway, length
+        ("A", 1, 2, True, 100.0),
+        ("B", 2, 3, True, 50.0),     # short connector A -> C
+        ("C", 3, 4, True, 100.0),
+        ("T", 3, 2, False, 40.0),    # two-way connector stored 3->2 (so 2->3 is 'rev')
+        ("L", 4, 5, True, 400.0),    # long connector
+        ("M", 5, 6, True, 100.0),
+        ("W", 8, 7, True, 30.0),     # one-way the WRONG way (7 <- 8)
+        ("X", 6, 7, True, 100.0),
+    ]
+    return pd.DataFrame({"segment_id": [r[0] for r in rows], "from_node": [r[1] for r in rows],
+                         "to_node": [r[2] for r in rows], "oneway": [r[3] for r in rows],
+                         "length_m": [r[4] for r in rows]})
+
+
+def seq_of(*items):
+    return pd.DataFrame({"shape_id": "s", "route": "R", "seq_order": range(len(items)),
+                         "segment_id": [i[0] for i in items], "travel": [i[1] for i in items]})
+
+
+def test_short_gap_is_filled_with_the_connecting_segment():
+    filled, gaps = fill_gaps(seq_of(("A", "fwd"), ("C", "fwd")), gap_segs().query("segment_id != 'T'"))
+    assert list(filled["segment_id"]) == ["A", "B", "C"]
+    assert list(filled["source"]) == ["matched", "filled", "matched"]
+    assert list(filled["seq_order"]) == [0, 1, 2]
+    assert gaps.loc[0, "status"] == "filled" and gaps.loc[0, "n_inserted"] == 1
+
+
+def test_two_way_connector_is_used_in_the_right_direction():
+    # remove B so the only way from node 2 to node 3 is the two-way T (stored 3->2)
+    filled, _ = fill_gaps(seq_of(("A", "fwd"), ("C", "fwd")), gap_segs().query("segment_id != 'B'"))
+    assert list(filled["segment_id"]) == ["A", "T", "C"]
+    assert filled.loc[1, "travel"] == "rev"
+
+
+def test_gap_longer_than_limit_is_reported_not_filled():
+    filled, gaps = fill_gaps(seq_of(("C", "fwd"), ("M", "fwd")), gap_segs())   # needs 400 m link L
+    assert list(filled["segment_id"]) == ["C", "M"]
+    assert gaps.loc[0, "status"] == "unbridged"
+
+
+def test_one_way_connector_in_wrong_direction_is_not_used():
+    _, gaps = fill_gaps(seq_of(("X", "fwd"), ("W", "fwd")), gap_segs())
+    assert gaps.loc[0, "status"] == "unbridged"
+
+
+def test_already_joined_pairs_are_left_alone():
+    filled, gaps = fill_gaps(seq_of(("A", "fwd"), ("B", "fwd"), ("C", "fwd")), gap_segs())
+    assert list(filled["segment_id"]) == ["A", "B", "C"] and set(filled["source"]) == {"matched"}
+    assert len(gaps) == 0

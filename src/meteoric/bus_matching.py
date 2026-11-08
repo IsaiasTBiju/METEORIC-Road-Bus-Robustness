@@ -227,3 +227,67 @@ def build_sequences(matched: pd.DataFrame, segs: pd.DataFrame) -> tuple[pd.DataF
         })
     return (pd.DataFrame(seq_rows, columns=["shape_id", "route", "seq_order", "segment_id", "travel"]),
             pd.DataFrame(qual_rows))
+
+
+FILL_GAP_M = 100      # gaps up to this many metres are filled with the shortest legal route
+MIN_SHARE_OK = 0.95   # a bus line counts as 'complete' only if this share of its points matched
+
+
+def fill_gaps(seq: pd.DataFrame, segs: pd.DataFrame, max_gap_m: float = FILL_GAP_M):
+    """Insert the road segments a bus must have used between two matched segments.
+
+    seq: shape_id, route, seq_order, segment_id, travel (from build_sequences).
+    segs: segment_id, from_node, to_node, oneway, length_m.
+    A gap is filled only if a direction-respecting route of at most max_gap_m exists.
+    Longer or impossible gaps are left as they are and reported as 'unbridged'.
+
+    Returns (filled_seq, gaps). filled_seq has an extra 'source' column ('matched' / 'filled')
+    and renumbered seq_order. gaps has one row per break: shape_id, route, from_segment,
+    to_segment, status ('filled' / 'unbridged'), gap_m, n_inserted.
+    """
+    graph = build_directed(segs[["segment_id", "from_node", "to_node", "oneway", "length_m"]])
+    ends = {r.segment_id: (r.from_node, r.to_node) for r in segs.itertuples(index=False)}
+    cache = {}
+
+    def reach(node):
+        if node not in cache:
+            cache[node] = nx.single_source_dijkstra(graph, node, cutoff=max_gap_m, weight="length_m")
+        return cache[node]
+
+    def segments_on(path):
+        out = []
+        for u, v in zip(path[:-1], path[1:]):
+            keys = graph[u][v]
+            sid = min(keys, key=lambda k: keys[k]["length_m"])
+            out.append((sid, "fwd" if ends[sid] == (u, v) else "rev"))
+        return out
+
+    rows, gap_rows = [], []
+    for shape_id, g in seq.sort_values(["shape_id", "seq_order"]).groupby("shape_id", sort=False):
+        items = list(zip(g["segment_id"], g["travel"]))
+        route = g["route"].iloc[0]
+        out = []
+        for k, (sid, tr) in enumerate(items):
+            out.append((sid, tr, "matched"))
+            if k + 1 == len(items):
+                break
+            nsid, ntr = items[k + 1]
+            f, t = ends[sid]
+            nf, nt = ends[nsid]
+            exit_node = t if tr == "fwd" else f
+            entry_node = nf if ntr == "fwd" else nt
+            if exit_node == entry_node:
+                continue
+            dist, paths = reach(exit_node)
+            if entry_node in dist:
+                add = segments_on(paths[entry_node])
+                out.extend((s, d, "filled") for s, d in add)
+                gap_rows.append((shape_id, route, sid, nsid, "filled", dist[entry_node], len(add)))
+            else:
+                gap_rows.append((shape_id, route, sid, nsid, "unbridged", np.nan, 0))
+        for i, (sid, tr, src) in enumerate(out):
+            rows.append((shape_id, route, i, sid, tr, src))
+    filled = pd.DataFrame(rows, columns=["shape_id", "route", "seq_order", "segment_id", "travel", "source"])
+    gaps = pd.DataFrame(gap_rows, columns=["shape_id", "route", "from_segment", "to_segment",
+                                           "status", "gap_m", "n_inserted"])
+    return filled, gaps
