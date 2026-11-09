@@ -35,13 +35,13 @@ def band(df, col):
     return g.mean(), g.quantile(0.05), g.quantile(0.95)
 
 
-def style(ax, ylabel, title):
+def style(ax, ylabel, title, decimals=0):
     ax.set_facecolor(SURFACE)
     ax.set_xscale("log")
     ax.set_xticks(SIZES)
     ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{int(v):,}"))
     ax.xaxis.set_minor_locator(NullLocator())
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:.0%}"))
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:.{decimals}%}"))
     ax.set_xlabel("Road segments removed", color=MUTED)
     ax.set_ylabel(ylabel, color=MUTED)
     ax.set_title(title, loc="left", color=INK, fontsize=11)
@@ -60,7 +60,7 @@ def draw(rand, targ, path, n_seeds):
         a1.fill_between(m.index, lo, hi, color=color, alpha=0.18, linewidth=0)
         a1.plot(m.index, m, color=color, linewidth=2, marker="o", markersize=5, markeredgecolor=SURFACE,
                 markeredgewidth=1.5, label=label)
-    style(a1, "Largest connected piece kept", f"Road connectivity: random removal ({n_seeds} seeds, band = 5th-95th pct)")
+    style(a1, "Largest connected piece kept", f"Road connectivity: random removal ({n_seeds} seeds, band = 5th-95th pct)", decimals=1)
     a1.legend(frameon=False, fontsize=8, loc="lower left", labelcolor=INK)
     # Panel 2: demand affected, random vs the two targeted rankings
     m, lo, hi = band(rand[rand["model"] == "M0"], "demand_affected_share")
